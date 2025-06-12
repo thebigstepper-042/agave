@@ -1157,6 +1157,28 @@ impl Blockstore {
         }
     }
 
+    fn get_block_id(&self, slot: Slot)->Option<Hash> {
+        self.meta(slot)
+            .unwrap_or(None)
+            .map_or(None, |meta| meta.last_index)
+            .map_or(None, |index| {
+                self
+                    .get_data_shred(slot, index)
+                    .unwrap_or(None)
+                    .map_or(None, |shred| shred::layout::get_merkle_root(&shred))
+        })
+    }
+
+    pub fn get_block_id_with_lock(&self, slot: Slot)->Option<Hash> {
+        let block_id = self.get_block_id(slot);
+        if block_id.is_none() {
+            warn!("block_id WAS NONE!");
+            let _lock = self.insert_shreds_lock.lock().unwrap();
+            return self.get_block_id(slot);
+        }
+        return block_id;
+    }
+
     fn commit_updates_to_write_batch(
         &self,
         shred_insertion_tracker: &mut ShredInsertionTracker,

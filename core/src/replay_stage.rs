@@ -2950,16 +2950,7 @@ impl ReplayStage {
         // The block_id of the bank, i.e. the block_id of the latest slot,
         // is used to compute chained merkle shreds.
         // The code is analogous to broadcast_utils::get_chained_merkle_root_from_parent()
-        let block_id = blockstore
-            .meta(slot)
-            .unwrap_or(None)
-            .map_or(None, |meta| meta.last_index)
-            .map_or(None, |index| {
-                blockstore
-                    .get_data_shred(slot, index)
-                    .unwrap_or(None)
-                    .map_or(None, |shred| shred::layout::get_merkle_root(&shred))
-            });
+        let block_id = blockstore.get_block_id_with_lock(slot);
         bank.set_block_id(block_id);
 
         poh_recorder.write().unwrap().reset(bank, next_leader_slot);
