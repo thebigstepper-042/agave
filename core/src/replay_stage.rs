@@ -2946,20 +2946,34 @@ impl ReplayStage {
         );
 
         // FIREDANCER: before calling poh_recorder, we set the block_id
-        // in the bank. The block_id should always be available at this time.
+        // in the bank. The block_id should always be available at this time,
+        // but experimentally we get rare cases when it's not, so we retry.
         // The block_id of the bank, i.e. the block_id of the latest slot,
         // is used to compute chained merkle shreds.
         // The code is analogous to broadcast_utils::get_chained_merkle_root_from_parent()
-        let block_id = blockstore
-            .meta(slot)
-            .unwrap_or(None)
-            .map_or(None, |meta| meta.last_index)
-            .map_or(None, |index| {
-                blockstore
-                    .get_data_shred(slot, index)
-                    .unwrap_or(None)
-                    .map_or(None, |shred| shred::layout::get_merkle_root(&shred))
-            });
+        let mut block_id = None;
+        for i in (0..3).rev() {
+            let now = Instant::now();
+            block_id = blockstore
+                .meta(slot)
+                .unwrap_or(None)
+                .map_or(None, |meta| meta.last_index)
+                .map_or(None, |index| {
+                    blockstore
+                        .get_data_shred(slot, index)
+                        .unwrap_or(None)
+                        .map_or(None, |shred| shred::layout::get_merkle_root(&shred))
+                });
+            if block_id.is_some() {
+                break;
+            }
+            warn!("block_id was null {}", i);
+            if i > 0 {
+                while now.elapsed() < Duration::from_micros(5) {
+                    // wait
+                }
+            }
+        }
         bank.set_block_id(block_id);
 
         poh_recorder.write().unwrap().reset(bank, next_leader_slot);

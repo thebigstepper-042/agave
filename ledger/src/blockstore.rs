@@ -2304,6 +2304,7 @@ impl Blockstore {
             data_index,
         )
         .map(move |indices| CompletedDataSetInfo { slot, indices });
+        self.meta_cf.put_in_batch(write_batch, slot_meta.slot, slot_meta)?;
 
         self.slots_stats.record_shred(
             shred.slot(),
