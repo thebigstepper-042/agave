@@ -179,7 +179,8 @@ pub extern "C" fn fd_ext_bank_execute_and_commit_bundle(bank: *const std::ffi::c
         match err {
             solana_bundle::bundle_execution::LoadAndExecuteBundleError::TransactionError { index, execution_result, .. } => {
                 for j in 0..txn_count {
-                    unsafe { *out_transaction_err.offset(j as isize) = transaction_error_to_code(&TransactionError::CommitCancelled) };
+                    // FIREDANCER: 40 is a custom error code for the BundlePeer error.
+                    unsafe { *out_transaction_err.offset(j as isize) = 40 };
                 }
 
                 for j in (*index)..(txn_count as usize) {
