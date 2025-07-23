@@ -3556,6 +3556,8 @@ impl Bank {
         processing_config: TransactionProcessingConfig,
     ) -> LoadAndExecuteTransactionsOutput {
         let sanitized_txs = batch.sanitized_transactions();
+        let simple_votes = batch.sanitized_transactions().iter().filter(|tx| tx.is_simple_vote_transaction()).count();
+        log::warn!("2 agave found {} simple votes", simple_votes);
 
         timings.details.ts_tx_preload_end = unsafe { std::arch::x86_64::_rdtsc() };
         let (check_results, check_us) = measure_us!(self.check_transactions(
@@ -3601,6 +3603,9 @@ impl Bank {
         let mut processed_counts = ProcessedTransactionCounts::default();
         let err_count = &mut error_counters.total;
 
+        if sanitized_output.processing_results.len() != sanitized_txs.len() {
+            warn!("ERR SHOULDNT BE HERE");
+        }
         for (processing_result, tx) in sanitized_output
             .processing_results
             .iter()
@@ -3625,6 +3630,10 @@ impl Bank {
                 processed_counts.processed_transactions_count += 1;
 
                 if !tx.is_simple_vote_transaction() {
+                    warn!(
+                        "agave nonvote encountered in slot {}",
+                        self.slot()
+                    );
                     processed_counts.processed_non_vote_transactions_count += 1;
                 }
             }

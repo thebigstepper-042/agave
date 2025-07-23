@@ -1,26 +1,18 @@
 use {
-    super::leader_slot_timing_metrics::LeaderExecuteAndCommitTimings,
-    itertools::Itertools,
-    solana_cost_model::cost_model::CostModel,
-    solana_ledger::{
+    super::leader_slot_timing_metrics::LeaderExecuteAndCommitTimings, itertools::Itertools, solana_cost_model::cost_model::CostModel, solana_ledger::{
         blockstore_processor::TransactionStatusSender,
         transaction_balances::compile_collected_balances,
-    },
-    solana_measure::measure_us,
-    solana_runtime::{
+    }, solana_measure::measure_us, solana_runtime::{
         bank::{Bank, ProcessedTransactionCounts},
         bank_utils,
         prioritization_fee_cache::PrioritizationFeeCache,
         transaction_batch::TransactionBatch,
         vote_sender_types::ReplayVoteSender,
-    },
-    solana_runtime_transaction::transaction_with_meta::TransactionWithMeta,
-    solana_svm::{
+    }, solana_runtime_transaction::{runtime_transaction::RuntimeTransaction, transaction_with_meta::TransactionWithMeta}, solana_svm::{
         transaction_balances::BalanceCollector,
         transaction_commit_result::{TransactionCommitResult, TransactionCommitResultExtensions},
         transaction_processing_result::TransactionProcessingResult,
-    },
-    std::{num::Saturating, sync::Arc, time::Duration},
+    }, solana_transaction::sanitized::SanitizedTransaction, std::{num::Saturating, sync::Arc, time::Duration}
 };
 
 pub(crate) static FIREDANCER_COMMITTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -210,6 +202,16 @@ pub extern "C" fn fd_ext_bank_execute_and_commit_bundle(bank: *const std::ffi::c
     1
 }
 
+pub fn test1(batch: &TransactionBatch<impl TransactionWithMeta>) {
+    let simple_votes = batch.sanitized_transactions().iter().filter(|tx| tx.is_simple_vote_transaction()).count();
+    log::warn!("3 agave found {} simple votes", simple_votes);
+}
+
+pub fn test2(batch: &TransactionBatch<RuntimeTransaction<SanitizedTransaction>>) {
+    let simple_votes = batch.sanitized_transactions().iter().filter(|tx| tx.is_simple_vote_transaction()).count();
+    log::warn!("4 agave found {} simple votes", simple_votes);
+}
+
 #[no_mangle]
 pub extern "C" fn fd_ext_bank_load_and_execute_txns( bank: *const std::ffi::c_void, txns: *const std::ffi::c_void, txn_count: u64, out_processing_result: *mut i32, out_transaction_err: *mut i32, out_consumed_exec_cus: *mut u32, out_consumed_acct_data_cus: *mut u32, out_timestamps: *mut u64, out_tips: *mut u64 ) -> *mut std::ffi::c_void {
     use solana_timings::ExecuteTimings;
@@ -263,6 +265,13 @@ pub extern "C" fn fd_ext_bank_load_and_execute_txns( bank: *const std::ffi::c_vo
 
     let mut timings = ExecuteTimings::default();
     let transaction_status_sender_enabled = committer.transaction_status_sender_enabled();
+
+    let simple_votes = batch.sanitized_transactions().iter().filter(|tx| tx.is_simple_vote_transaction()).count();
+    log::warn!("1 agave found {} simple votes slot={}", simple_votes, bank.slot());
+
+    test1(&batch);
+    test2(&batch);
+
     let output = bank.load_and_execute_transactions(&batch, MAX_PROCESSING_AGE, &mut timings,
         &mut TransactionErrorMetrics::default(),
         TransactionProcessingConfig {
